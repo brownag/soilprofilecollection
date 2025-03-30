@@ -1,0 +1,178 @@
+---
+output: github_document
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "assets/figures/README-",
+  out.width = "100%"
+)
+```
+
+# Python SoilProfileCollection Module
+
+## Author: Andrew Gene Brown
+
+A Python implementation of the _SoilProfileCollection_ object from the [R package 'aqp'](https://ncss-tech.github.io/aqp/).
+
+# Installation
+
+For now you can install `soilprofilecollection` directly from GitHub.
+
+For instance, add it to an existing project using [`poetry`](https://python-poetry.org/docs/):
+
+```{sh, eval=FALSE}
+poetry add git+https://github.com/brownag/soilprofilecollection.git
+```
+
+# Examples
+
+The `soilprofilecollection` module provides the `SoilProfileCollection` class.
+
+```{python load-module}
+from soilprofilecollection import SoilProfileCollection
+```
+
+Data in a `SoilProfileCollection` object are instantiated from Pandas `DataFrame` objects.
+
+```{python sample-data}
+import pandas as pd
+
+# --- Sample Site Data (mimicking aqp::sp4 site data) ---
+# Represents profile-level information.
+# The 'id' column links to the 'id' column in the horizon data.
+
+site_data_dict = {
+    'id': ['P001', 'P002', 'P003', 'P004'],  # Profile IDs (unique identifier)
+    'group': ['A', 'B', 'B', 'A'],           # Example site grouping variable
+    'elev': [1154, 1158, 1156, 1150],        # Elevation (example numeric site variable)
+    'slope_field': [4, 3, 5, 6],             # Slope (example numeric site variable)
+    'aspect_field': [330, 290, 40, 90]       # Aspect (example numeric site variable)
+    
+    # Add other relevant site-level columns here (e.g., coordinates, classification)
+}
+site_data = pd.DataFrame(site_data_dict)
+print(site_data)
+
+# --- Sample Horizon Data (mimicking aqp::sp4 horizon data) ---
+# Represents horizon-level information.
+# - 'hzid': Unique identifier for each horizon row.
+# - 'id': Profile ID, linking this horizon to a profile in the site data.
+# - 'top', 'bottom': Depth columns defining the horizon boundaries.
+# - 'hzname': Horizon designation (e.g., Ap, Bt1).
+# - 'genhz': Master horizon designation group (e.g. A, B, C)
+# - Other columns ('clay', 'sand', 'phfield'): Example horizon numeric properties.
+
+hz_data_dict = {
+    'hzid': [133, 134, 135, 136, 137,   # Unique horizon IDs (must be unique across all horizons)
+             138, 139, 140, 141,        # Usually integers or unique strings
+             142, 143, 144,
+             145, 146, 147],
+    'id': ['P001', 'P001', 'P001', 'P001', 'P001',  # Profile IDs (link to site data)
+           'P002', 'P002', 'P002', 'P002',
+           'P003', 'P003', 'P003',
+           'P004', 'P004', 'P004'],
+    'hzname': ['Ap', 'A', 'ABt', 'Bt1', 'Bt2',  # Horizon designations (often strings)
+               'Ap', 'A', 'Bt1', 'Bt2',
+               'Ap', 'AB', 'Bt',
+               'A', 'Bw', 'C'],
+    'genhz': ['A','A','A','B','B',
+              'A','A','B','B',
+              'A','A','B',
+              'A','B','C'],
+    'top': [0, 18, 30, 46, 61,  # Top depths (numeric)
+            0, 15, 38, 56,
+            0, 20, 41,
+            0, 10, 35],
+    'bottom': [18, 30, 46, 61, 91,  # Bottom depths (numeric)
+               15, 38, 56, 84,
+               20, 41, 76,
+               10, 35, 80],
+    'clay': [21, 20, 24, 26, 27,  # Clay content (%) (example numeric property)
+             18, 19, 28, 25,
+             22, 26, 29,
+             15, 18, 12],
+    'sand': [54, 53, 50, 48, 47,  # Sand content (%) (example numeric property)
+             58, 55, 45, 48,
+             51, 49, 42,
+             60, 55, 65],
+    'phfield': [6.2, 6.0, 5.9, 5.9, 6.1,  # pH (field measure) (example numeric property)
+                6.5, 6.3, 6.0, 6.2,
+                6.1, 5.8, 5.9,
+                6.8, 6.5, 7.0]
+    # Add other relevant horizon-level columns here (e.g., color, structure, roots)
+}
+hz_data = pd.DataFrame(hz_data_dict)
+print(hz_data)
+```
+
+Once we hae a `DataFrame` containing site and horizon data, we instantiate the `SoilProfileCollection` object using the constructor:
+
+```{python spc-instantiate}
+# Instantiate the collection using the column names defined above
+spc = SoilProfileCollection(
+  horizons=hz_data,
+  site=site_data,
+  idname='id',           # Column name for profile IDs
+  hzidname='hzid',       # Column name for unique horizon IDs
+  depthcols=('top','bottom'), # Tuple of (top_col, bottom_col)
+  hzdesgncol='hzname'    # Column name for horizon designations (optional)
+)
+```
+
+The `SoilProfileCollection` class has several properties and methods:
+
+```{python spc-methods}
+print(spc)
+print(len(spc))
+print(spc.site)
+print(spc.depths())
+print(spc.depths(how="minmax"))
+
+subset = spc[0:3] # Get first 3 profiles
+print(len(subset))
+
+subset2 = spc[0:3,0:2]
+print(len(subset))
+
+standard_intervals = [25, 50]
+x = subset.glom(intervals = standard_intervals)
+y = subset.glom(intervals = standard_intervals, truncate = True)
+z = subset.glom(intervals = standard_intervals, agg_fun = "dominant")
+```
+
+You can also create sketches of the data stored in the object using the `.plot()` method:
+
+```{python spc-sketches}
+ap = subset.plot(color="clay", label_hz=True) # Color by clay content
+import matplotlib.pyplot as plt
+plt.suptitle("Sample SPC Plot (Colored by Clay %)")
+plt.show()
+print(subset)
+
+ap2 = subset2.plot(color="clay", label_hz=True) # Color by clay content
+import matplotlib.pyplot as plt
+plt.suptitle("Sample SPC Plot (Colored by Clay %)")
+plt.show()
+print(subset2)
+
+ax = x.plot(color="clay", label_hz=True) # Color by clay content
+import matplotlib.pyplot as plt
+plt.suptitle("Sample SPC Plot (Colored by Clay %)")
+plt.show()
+print(x)
+
+ay = y.plot(color="clay", label_hz=True) # Color by clay content
+import matplotlib.pyplot as plt
+plt.suptitle("Sample SPC Plot (Colored by Clay %)")
+plt.show()
+print(y)
+
+az = z.plot(color="clay", label_hz=True) # Color by clay content
+import matplotlib.pyplot as plt
+plt.suptitle("Sample SPC Plot (Colored by Clay %)")
+plt.show()
+print(z)
+```

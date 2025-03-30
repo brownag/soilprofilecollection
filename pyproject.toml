@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "soilprofilecollection"
+version = "0.1.0"
+description = "A 'Python' implementation of the 'SoilProfileCollection' object from the 'R' package 'aqp'"
+authors = ["Andrew Gene Brown <brown.andrewg@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+matplotlib = "^3.10.1"
+pandas = "^2.2.3"
+numpy = "^2.2.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
