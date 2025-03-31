@@ -16,11 +16,11 @@ build:
 mkdocs:
    configuration: mkdocs.yml
 
+# Specify dependencies for docs
+# # Use pip-tools
+# pip-compile -o docs/requirements.txt pyproject.toml
 python:
-  install:
-    - method: setuptools 
-      path: .        
-      extras:
-        - docs 
-        
+   install:
+   - requirements: docs/requirements.txt
+
 
