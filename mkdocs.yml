@@ -1,0 +1,8 @@
+site_name: soilprofilecollection Docs
+
+theme:
+  name: "readthedocs"
+
+plugins:
+- search
+- mkdocstrings

@@ -5,3 +5,6 @@
 build
 README.html
 soilprofilecollection.Rproj
+site
+dist
+docs
