@@ -54,15 +54,16 @@ def _validate_depths(horizons_df: pd.DataFrame, idname: str, topcol: str, bottom
 
         # Ignore the last horizon comparison (will be NaN)
         if overlaps.iloc[:-1].any():
-            errors.append(f"Profile ID '{profile_id}' has overlapping horizons.")
+            overlap_hzids = horizons_sorted[overlaps.shift(1, fill_value=False)].index
+            errors.append(f"Profile ID '{profile_id}' has overlapping horizons (e.g., around horizon ID(s) {list(overlap_hzids)}).")
+        # Check for gaps, ignoring the last horizon which has no 'next' horizon to compare to
         if gaps.iloc[:-1].any():
-             # Check if gap isn't just floating point error (e.g., 10.0 vs 10.0000001)
-             gap_indices = gaps[gaps].index[:-1] # Exclude last comparison
-             potential_gaps = horizons_sorted.loc[gap_indices, bottomcol] - \
-                              horizons_sorted[topcol].shift(-1).loc[gap_indices]
-             # Use a small tolerance for floating point comparisons
-             if not np.allclose(potential_gaps, 0):
-                 errors.append(f"Profile ID '{profile_id}' has depth gaps between horizons.")
+             gap_indices = gaps[gaps].index
+             gap_diffs = horizons_sorted[topcol].shift(-1).loc[gap_indices] - horizons_sorted.loc[gap_indices, bottomcol]
+             # If ANY gap is found that is NOT close to zero, it's a real gap.
+             if np.any(~np.isclose(gap_diffs, 0, atol=1e-9)):
+                 first_gap_hzid = gap_indices[0]
+                 errors.append(f"Profile ID '{profile_id}' has depth gaps between horizons (e.g., after horizon ID '{first_gap_hzid}').")
                  
         # Check for duplicated depths within a profile (e.g., two horizons 0-10)
         depth_pairs = horizons[[topcol, bottomcol]].apply(tuple, axis=1)
@@ -221,6 +222,67 @@ def _slice_single_profile(profile_horizons: pd.DataFrame,
 
     return pd.DataFrame(sliced_segments)
 
+def import_data_sheet(
+    data: pd.DataFrame,
+    schema_template: Dict[str, str],
+    idname: str = 'id',
+    hzidname: str = 'hzid',
+    depthcols: Tuple[str, str] = ('top', 'bottom'),
+    hzdesgncol: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    crs: Optional[Any] = None,
+    validate: bool = True
+) -> 'SoilProfileCollection':
+    """
+    Imports data from a DataFrame and creates a SoilProfileCollection object
+    based on a schema template.
+
+    Args:
+        data: DataFrame containing the soil profile data.
+        schema_template: A dictionary mapping source column names in `data`
+                         to the target column names required by SoilProfileCollection.
+                         Example: {'profile_id': 'id', 'horizon_top': 'top'}
+        idname: Target column name for profile IDs.
+        hzidname: Target column name for unique horizon IDs.
+        depthcols: Tuple of (top_depth_column_name, bottom_depth_column_name).
+        hzdesgncol: Optional target column name for horizon designations.
+        metadata: Optional dictionary for metadata.
+        crs: Optional Coordinate Reference System information.
+        validate: If True (default), performs validation checks on initialization.
+
+    Returns:
+        A new SoilProfileCollection instance.
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("`data` must be a pandas DataFrame.")
+    if not isinstance(schema_template, dict):
+        raise TypeError("`schema_template` must be a dictionary.")
+
+    # Make a copy to avoid modifying the original DataFrame
+    processed_data = data.copy()
+
+    # Rename columns based on the schema template
+    processed_data.rename(columns=schema_template, inplace=True)
+
+    # For now, assume all data is horizon data and derive site data.
+    # A more advanced implementation will split site/horizon data based on the template.
+    horizons_df = processed_data
+
+    # A minimal site DataFrame will be created by the SPC constructor
+    site_df = None
+
+    return SoilProfileCollection(
+        horizons=horizons_df,
+        site=site_df,
+        idname=idname,
+        hzidname=hzidname,
+        depthcols=depthcols,
+        hzdesgncol=hzdesgncol,
+        metadata=metadata,
+        crs=crs,
+        validate=validate
+    )
+
 # --- SoilProfileCollection class ---
 
 class SoilProfileCollection:
@@ -322,7 +384,6 @@ class SoilProfileCollection:
             site_ids = self._horizons[self._idname].unique()
             self._site = pd.DataFrame({self._idname: site_ids}).set_index(self._idname)
             self._site.index.name = f"{self._idname}_idx"
-            print("Note: No site data provided. Created minimal site table from horizon profile IDs.")
         else:
             s = site.copy()
              # Check required site column
@@ -498,99 +559,6 @@ class SoilProfileCollection:
         """User-friendly string representation."""
         return self.__repr__() 
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Converts the SoilProfileCollection to a JSON-serializable dictionary."""
-        profiles = []
-        site_df = self.site
-        horizon_df = self.horizons
-        id_col = self.idname
-
-        for profile_id in self.profile_ids:
-            site_data = site_df[site_df[id_col] == profile_id].to_dict('records')
-            profile_horizons = horizon_df[horizon_df[id_col] == profile_id]
-            horizons_data = profile_horizons.to_dict('records')
-            
-            profiles.append({
-                'profile_id': str(profile_id),
-                'site_data': site_data[0] if site_data else {},
-                'horizons': horizons_data,
-                'metadata': {} 
-            })
-
-        return {
-            'profiles': profiles,
-            'spatial_reference': str(self.crs) if self.crs else None,
-            'collection_metadata': self.metadata
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]):
-        """Creates a SoilProfileCollection from a dictionary."""
-        all_sites, all_horizons = [], []
-        id_col = 'pedon_id'
-
-        for profile in data.get('profiles', []):
-            site_data = profile.get('site_data', {})
-            site_data[id_col] = profile['profile_id']
-            all_sites.append(site_data)
-
-            for horizon in profile.get('horizons', []):
-                horizon[id_col] = profile['profile_id']
-                all_horizons.append(horizon)
-
-        site_df = pd.DataFrame(all_sites)
-        horizon_df = pd.DataFrame(all_horizons)
-        
-        # Add hzidname if not present
-        if 'hzid' not in horizon_df.columns:
-            horizon_df['hzid'] = range(len(horizon_df))
-
-        return cls(
-            site=site_df,
-            horizons=horizon_df,
-            idname=id_col,
-            hzidname='hzid',
-            crs=data.get('spatial_reference'),
-            metadata=data.get('collection_metadata', {})
-        )
-
-    def check_consistency(self, top_col: str = 'top_depth', bottom_col: str = 'bottom_depth') -> List[Dict[str, Any]]:
-        """Checks soil profiles for consistency errors like gaps and overlaps."""
-        reports = []
-        for profile_id in self.profile_ids:
-            errors, warnings = [], []
-            profile_horizons = self.get_profile(profile_id)
-
-            if profile_horizons is None or profile_horizons.empty:
-                warnings.append("Profile has no horizons.")
-                reports.append({'profile_id': profile_id, 'is_valid': True, 'errors': errors, 'warnings': warnings})
-                continue
-
-            # Sort by top depth
-            profile_horizons = profile_horizons.sort_values(by=top_col)
-
-            # Check for negative thickness
-            if (profile_horizons[bottom_col] < profile_horizons[top_col]).any():
-                errors.append("One or more horizons have negative thickness (bottom < top).")
-
-            # Check for gaps and overlaps
-            for i in range(len(profile_horizons) - 1):
-                current_hz = profile_horizons.iloc[i]
-                next_hz = profile_horizons.iloc[i+1]
-                
-                if current_hz[bottom_col] > next_hz[top_col]:
-                    errors.append(f"Overlap between horizon {current_hz[self.hzidname]} and {next_hz[self.hzidname]}.")
-                elif current_hz[bottom_col] < next_hz[top_col]:
-                    warnings.append(f"Gap between horizon {current_hz[self.hzidname]} and {next_hz[self.hzidname]}.")
-
-            reports.append({
-                'profile_id': profile_id,
-                'is_valid': len(errors) == 0,
-                'errors': errors,
-                'warnings': warnings
-            })
-        return reports
-      
     def __getitem__(self, key: Union[int, slice, list, tuple, pd.Series, np.ndarray]) -> 'SoilProfileCollection':
         """
         Subsetting the SoilProfileCollection by profile index/ID ('i') and
@@ -694,33 +662,16 @@ class SoilProfileCollection:
                  new_horizons = selected_hz_groups
 
         # --- 3. Create and return new SoilProfileCollection ---
-        final_horizons = new_horizons.copy() if not new_horizons.empty else new_horizons
-        final_site = new_site.copy() if not new_site.empty else new_site
-
-        hz_cols_to_check = [self.idname, self.hzidname, self._topcol, self._bottomcol]
-        if self.hzdesgncol: hz_cols_to_check.append(self.hzdesgncol)
-        for col in hz_cols_to_check:
-             if col not in final_horizons.columns:
-                 if col == self.idname: dtype = self._site.index.dtype
-                 elif col in [self._topcol, self._bottomcol]: dtype=float
-                 else: dtype=object
-                 final_horizons[col] = pd.Series(dtype=dtype)
-
-        site_cols_to_check = [self.idname]
-        for col in site_cols_to_check:
-             if col not in final_site.columns:
-                   final_site[col] = pd.Series(dtype=self._site.index.dtype)
-
         return SoilProfileCollection(
-            horizons=final_horizons,
-            site=final_site,
+            horizons=new_horizons,
+            site=new_site,
             idname=self.idname,
             hzidname=self.hzidname,
             depthcols=self.depthcols,
             hzdesgncol=self.hzdesgncol,
             metadata=self.metadata.copy(),
             crs=self.crs,
-            validate=False
+            validate=False # Subsetting should not require re-validation
         )
 
 # Replace the depths() method within your SoilProfileCollection class with this:
@@ -986,7 +937,6 @@ class SoilProfileCollection:
                 hz_colors_series = self._horizons[color]
                 if pd.api.types.is_numeric_dtype(hz_colors_series):
                     is_numeric_color_col = True
-                    print(f"Note: Mapping numeric column '{color}' to colormap '{cmap}'.")
                     # Get data range, handling potential NaNs
                     valid_data = hz_colors_series.dropna()
                     data_min = vmin if vmin is not None else (valid_data.min() if not valid_data.empty else 0)
@@ -1004,12 +954,8 @@ class SoilProfileCollection:
                     except ValueError:
                         print(f"Warning: Invalid colormap name '{cmap}'. Using 'viridis'.")
                         cmap_obj = cm.get_cmap('viridis')
-                else:
-                    print(f"Note: Using non-numeric column '{color}' directly as colors.")
             else:
-                # Assume `color` is a fixed color string
                 fixed_color = color
-                print(f"Note: Using fixed color '{color}'.")
 
         # --- Plotting Loop ---
         for i, profile_id in enumerate(profile_ids_to_plot):
@@ -1181,14 +1127,9 @@ class SoilProfileCollection:
         vars_aggregated = []
 
         if agg_fun is None:
-            # --- Slicing Logic ---
             mode = "slicing"
-            print(f"Note: Performing {mode} (agg_fun=None). Truncate={effective_truncate}. "
-                  "Params 'v' and 'fill' ignored.")
             if hz.empty:
-                print("Warning: Horizon data is empty.")
-                slice_cols = list(hz.columns) # Get original columns
-                # Ensure core columns exist if hz was totally empty
+                slice_cols = list(hz.columns) 
                 for core_col in [id_col, original_hzid_col, top_col, bottom_col]:
                      if core_col not in slice_cols: slice_cols.append(core_col)
                 final_data_df = pd.DataFrame(columns=slice_cols)
@@ -1201,44 +1142,34 @@ class SoilProfileCollection:
                             profile_horizons=group_df, id_col=id_col, top_col=top_col,
                             bottom_col=bottom_col, slice_intervals=slice_intervals,
                             original_hzid_col=original_hzid_col,
-                            truncate=effective_truncate, # Pass determined value
-                            first_interval_top=first_interval_top, # Pass boundaries
+                            truncate=effective_truncate, 
+                            first_interval_top=first_interval_top, 
                             last_interval_bottom=last_interval_bottom
                         )
                         if not res.empty:
                             slice_results_list.append(res)
 
                 if not slice_results_list:
-                     print("Warning: No horizon segments overlapped with the specified intervals.")
-                     final_data_df = pd.DataFrame(columns=hz.columns) # Empty with original cols
+                     final_data_df = pd.DataFrame(columns=hz.columns) 
                 else:
                      final_data_df = pd.concat(slice_results_list, ignore_index=True)
-                     try: # Try to restore original column order
+                     try: 
                          final_data_df = final_data_df[hz.columns]
                      except KeyError:
                           print("Warning: Columns in sliced data differ from original.")
 
 
         else:
-            # --- Aggregation Logic ---
             mode = "aggregation"
-            print(f"Note: Performing {mode} with agg_fun='{agg_fun}'. "
-                  f"Effective truncate={effective_truncate} (implicit via overlap). Fill={fill}.")
-            if truncate is False:
-                 print("Note: truncate=False currently has no effect on aggregation results.")
-
-            # --- Start Aggregation ---
             if v is None:
                 if agg_fun in numeric_agg_funs:
                     potential_vars = hz.select_dtypes(include=np.number).columns.tolist()
                     vars_to_agg = [ col for col in potential_vars if col not in [id_col, top_col, bottom_col, original_hzid_col] ]
                     if not vars_to_agg: raise ValueError(f"No suitable numeric columns found for agg_fun='{agg_fun}'.")
-                    print(f"Note: Auto-detected numeric columns for '{agg_fun}': {vars_to_agg}")
                 elif agg_fun == 'dominant':
                     potential_vars = hz.columns.tolist()
                     vars_to_agg = [ col for col in potential_vars if col not in [id_col, top_col, bottom_col, original_hzid_col] ]
                     if not vars_to_agg: raise ValueError("No suitable columns found for agg_fun='dominant'.")
-                    print(f"Note: Auto-detected columns for 'dominant': {vars_to_agg}")
                 else: raise ValueError("Cannot auto-detect variables for unknown agg_fun.") # Should not happen
             elif isinstance(v, str): vars_to_agg = [v]
             elif isinstance(v, (list, tuple)): vars_to_agg = list(v)
@@ -1252,7 +1183,6 @@ class SoilProfileCollection:
             vars_aggregated = vars_to_agg
             
             if hz.empty:
-                print("Warning: Horizon data is empty.")
                 agg_cols = [id_col, top_col, bottom_col] + vars_aggregated
                 glommed_data = pd.DataFrame(columns=agg_cols)
             else:
@@ -1272,7 +1202,6 @@ class SoilProfileCollection:
                  if glommed_data_list: glommed_data = pd.concat(glommed_data_list, ignore_index=True)
                  else: glommed_data = pd.DataFrame(columns=[id_col, top_col, bottom_col] + vars_aggregated)
 
-            # --- Start Fill Logic ---
             if fill:
                 all_profile_ids = self._site.index
                 interval_df = pd.DataFrame(slice_intervals, columns=[top_col, bottom_col])
@@ -1293,13 +1222,11 @@ class SoilProfileCollection:
             else:
                 final_data_df = glommed_data
 
-            # Ensure final column order for aggregated data
             agg_cols_ordered = [id_col, top_col, bottom_col] + vars_aggregated
             for col in agg_cols_ordered:
                  if col not in final_data_df.columns: final_data_df[col] = np.nan
             final_data_df = final_data_df[agg_cols_ordered]
 
-        # --- Ensure Correct Dtypes (applies to both results) ---
         try:
             if id_col in final_data_df.columns:
                  final_data_df[id_col] = final_data_df[id_col].astype(self._site.index.dtype)
@@ -1317,12 +1244,10 @@ class SoilProfileCollection:
                                 final_data_df[var] = pd.to_numeric(final_data_df[var], errors='coerce')
         except Exception as e: print(f"Warning: Could not enforce final dtypes consistently: {e}")
 
-        # --- Return DataFrame or construct new SPC ---
         if output == 'dataframe':
             return final_data_df
-        else: # output == 'spc'
+        else: 
              if final_data_df.empty:
-                 print("Note: Result is empty, returning an empty SoilProfileCollection.")
                  empty_hz_cols = [id_col, effective_new_hzidname, top_col, bottom_col] + (vars_aggregated if agg_fun else list(hz.columns))
                  empty_hz_cols = list(dict.fromkeys(empty_hz_cols))
                  empty_hz = pd.DataFrame(columns=empty_hz_cols).astype({id_col: self._site.index.dtype, top_col: float, bottom_col: float})
@@ -1335,28 +1260,22 @@ class SoilProfileCollection:
 
              new_horizons_df = final_data_df.copy()
 
-             # Add the new unique horizon ID column (using effective name)
              if effective_new_hzidname in new_horizons_df.columns and effective_new_hzidname != original_hzid_col:
                  raise ValueError(f"Chosen `new_hzidname` ('{effective_new_hzidname}') conflicts with existing column.")
 
-             # Add sequence if new name doesn't exist or if slicing (always needs unique IDs per segment)
              if effective_new_hzidname not in new_horizons_df.columns or agg_fun is None:
                   new_horizons_df[effective_new_hzidname] = range(len(new_horizons_df))
                   new_horizons_df[effective_new_hzidname] = new_horizons_df[effective_new_hzidname].astype(str)
 
-             # Get unique profile IDs present in the results & filter site data
              profile_ids_in_result = new_horizons_df[id_col].unique()
              try:
                  new_site_df = self._site.loc[profile_ids_in_result].copy()
              except KeyError:
-                 print("Warning: Filtering site data based on result IDs.")
                  new_site_df = self._site[self._site.index.isin(profile_ids_in_result)].copy()
              except Exception as e:
                   raise RuntimeError(f"Could not filter site data for resulting SPC: {e}")
 
-             # Instantiate the new SoilProfileCollection
              try:
-                 # Determine hzdesgncol: Keep original if slicing, None if aggregating
                  final_hzdesgncol = self.hzdesgncol if agg_fun is None and self.hzdesgncol in new_horizons_df.columns else None
 
                  return SoilProfileCollection(
@@ -1371,7 +1290,7 @@ class SoilProfileCollection:
                      validate=False # Assume valid structure post-glom/slice
                  )
              except Exception as e:
-                  print(f"\nError creating final SPC:")
+                  print("\nError creating SPC:")
                   print(f"  Mode: {mode}, agg_fun: {agg_fun}, truncate: {effective_truncate}, fill: {fill if agg_fun else 'N/A'}")
                   print(f"  Horizons ({new_horizons_df.shape}):\n{new_horizons_df.head().to_string()}")
                   print(f"  Site ({new_site_df.shape}):\n{new_site_df.head().to_string()}")
