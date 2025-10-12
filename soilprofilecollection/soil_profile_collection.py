@@ -497,6 +497,99 @@ class SoilProfileCollection:
     def __str__(self) -> str:
         """User-friendly string representation."""
         return self.__repr__() 
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Converts the SoilProfileCollection to a JSON-serializable dictionary."""
+        profiles = []
+        site_df = self.site
+        horizon_df = self.horizons
+        id_col = self.idname
+
+        for profile_id in self.profile_ids:
+            site_data = site_df[site_df[id_col] == profile_id].to_dict('records')
+            profile_horizons = horizon_df[horizon_df[id_col] == profile_id]
+            horizons_data = profile_horizons.to_dict('records')
+            
+            profiles.append({
+                'profile_id': str(profile_id),
+                'site_data': site_data[0] if site_data else {},
+                'horizons': horizons_data,
+                'metadata': {} 
+            })
+
+        return {
+            'profiles': profiles,
+            'spatial_reference': str(self.crs) if self.crs else None,
+            'collection_metadata': self.metadata
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        """Creates a SoilProfileCollection from a dictionary."""
+        all_sites, all_horizons = [], []
+        id_col = 'pedon_id'
+
+        for profile in data.get('profiles', []):
+            site_data = profile.get('site_data', {})
+            site_data[id_col] = profile['profile_id']
+            all_sites.append(site_data)
+
+            for horizon in profile.get('horizons', []):
+                horizon[id_col] = profile['profile_id']
+                all_horizons.append(horizon)
+
+        site_df = pd.DataFrame(all_sites)
+        horizon_df = pd.DataFrame(all_horizons)
+        
+        # Add hzidname if not present
+        if 'hzid' not in horizon_df.columns:
+            horizon_df['hzid'] = range(len(horizon_df))
+
+        return cls(
+            site=site_df,
+            horizons=horizon_df,
+            idname=id_col,
+            hzidname='hzid',
+            crs=data.get('spatial_reference'),
+            metadata=data.get('collection_metadata', {})
+        )
+
+    def check_consistency(self, top_col: str = 'top_depth', bottom_col: str = 'bottom_depth') -> List[Dict[str, Any]]:
+        """Checks soil profiles for consistency errors like gaps and overlaps."""
+        reports = []
+        for profile_id in self.profile_ids:
+            errors, warnings = [], []
+            profile_horizons = self.get_profile(profile_id)
+
+            if profile_horizons is None or profile_horizons.empty:
+                warnings.append("Profile has no horizons.")
+                reports.append({'profile_id': profile_id, 'is_valid': True, 'errors': errors, 'warnings': warnings})
+                continue
+
+            # Sort by top depth
+            profile_horizons = profile_horizons.sort_values(by=top_col)
+
+            # Check for negative thickness
+            if (profile_horizons[bottom_col] < profile_horizons[top_col]).any():
+                errors.append("One or more horizons have negative thickness (bottom < top).")
+
+            # Check for gaps and overlaps
+            for i in range(len(profile_horizons) - 1):
+                current_hz = profile_horizons.iloc[i]
+                next_hz = profile_horizons.iloc[i+1]
+                
+                if current_hz[bottom_col] > next_hz[top_col]:
+                    errors.append(f"Overlap between horizon {current_hz[self.hzidname]} and {next_hz[self.hzidname]}.")
+                elif current_hz[bottom_col] < next_hz[top_col]:
+                    warnings.append(f"Gap between horizon {current_hz[self.hzidname]} and {next_hz[self.hzidname]}.")
+
+            reports.append({
+                'profile_id': profile_id,
+                'is_valid': len(errors) == 0,
+                'errors': errors,
+                'warnings': warnings
+            })
+        return reports
       
     def __getitem__(self, key: Union[int, slice, list, tuple, pd.Series, np.ndarray]) -> 'SoilProfileCollection':
         """
