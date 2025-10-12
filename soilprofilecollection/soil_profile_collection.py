@@ -54,7 +54,7 @@ def _validate_depths(horizons_df: pd.DataFrame, idname: str, topcol: str, bottom
 
         # Ignore the last horizon comparison (will be NaN)
         if overlaps.iloc[:-1].any():
-            overlap_hzids = horizons_sorted[overlaps.shift(1, fill_value=False)].index
+            overlap_hzids = horizons_sorted.iloc[:-1][overlaps.iloc[:-1]].index
             errors.append(f"Profile ID '{profile_id}' has overlapping horizons (e.g., around horizon ID(s) {list(overlap_hzids)}).")
         # Check for gaps, ignoring the last horizon which has no 'next' horizon to compare to
         if gaps.iloc[:-1].any():
