@@ -4,7 +4,7 @@ import pytest
 import matplotlib.axes
 
 from soilprofilecollection import SoilProfileCollection
-from soilprofilecollection.soil_profile_collection import import_data_sheet
+
 
 # Fixture for creating a sample SPC
 @pytest.fixture
@@ -85,8 +85,11 @@ def test_profile_apply(sample_spc):
     
     mean_clay_per_profile = sample_spc.profile_apply(mean_clay)
     assert isinstance(mean_clay_per_profile, pd.Series)
-    assert mean_clay_per_profile['P1'] == pytest.approx(27.5)
-    assert mean_clay_per_profile['P2'] == pytest.approx(24.333333333333332)
+    expected_p1_mean = sample_spc.horizons[sample_spc.horizons['id'] == 'P1']['clay'].mean()
+    assert mean_clay_per_profile['P1'] == pytest.approx(expected_p1_mean)
+    
+    expected_p2_mean = sample_spc.horizons[sample_spc.horizons['id'] == 'P2']['clay'].mean()
+    assert mean_clay_per_profile['P2'] == pytest.approx(expected_p2_mean)
 
 def test_validation_errors():
     """Tests that the SPC raises errors for invalid horizon data."""
@@ -125,8 +128,8 @@ def test_plot(sample_spc):
     ax = sample_spc.plot(color='color')
     assert isinstance(ax, matplotlib.axes.Axes)
 
-def test_import_data_sheet():
-    """Tests importing data with a schema template."""
+def test_from_dataframe():
+    """Tests creating an SPC from a DataFrame."""
     source_data = pd.DataFrame({
         'profile_id': ['P1', 'P1', 'P2'],
         'h_id': [1, 2, 3],
@@ -141,7 +144,7 @@ def test_import_data_sheet():
         'd_bottom': 'bottom'
     }
     
-    spc = import_data_sheet(source_data, schema)
+    spc = SoilProfileCollection.from_dataframe(source_data, schema)
 
     assert isinstance(spc, SoilProfileCollection)
     assert len(spc) == 2

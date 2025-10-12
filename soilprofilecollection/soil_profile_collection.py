@@ -58,7 +58,8 @@ def _validate_depths(horizons_df: pd.DataFrame, idname: str, topcol: str, bottom
             errors.append(f"Profile ID '{profile_id}' has overlapping horizons (e.g., around horizon ID(s) {list(overlap_hzids)}).")
         # Check for gaps, ignoring the last horizon which has no 'next' horizon to compare to
         if gaps.iloc[:-1].any():
-             gap_indices = gaps[gaps].index
+             valid_gaps = gaps.iloc[:-1]
+             gap_indices = valid_gaps[valid_gaps].index
              gap_diffs = horizons_sorted[topcol].shift(-1).loc[gap_indices] - horizons_sorted.loc[gap_indices, bottomcol]
              # If ANY gap is found that is NOT close to zero, it's a real gap.
              if np.any(~np.isclose(gap_diffs, 0, atol=1e-9)):
@@ -222,70 +223,70 @@ def _slice_single_profile(profile_horizons: pd.DataFrame,
 
     return pd.DataFrame(sliced_segments)
 
-def import_data_sheet(
-    data: pd.DataFrame,
-    schema_template: Dict[str, str],
-    idname: str = 'id',
-    hzidname: str = 'hzid',
-    depthcols: Tuple[str, str] = ('top', 'bottom'),
-    hzdesgncol: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-    crs: Optional[Any] = None,
-    validate: bool = True
-) -> 'SoilProfileCollection':
-    """
-    Imports data from a DataFrame and creates a SoilProfileCollection object
-    based on a schema template.
-
-    Args:
-        data: DataFrame containing the soil profile data.
-        schema_template: A dictionary mapping source column names in `data`
-                         to the target column names required by SoilProfileCollection.
-                         Example: {'profile_id': 'id', 'horizon_top': 'top'}
-        idname: Target column name for profile IDs.
-        hzidname: Target column name for unique horizon IDs.
-        depthcols: Tuple of (top_depth_column_name, bottom_depth_column_name).
-        hzdesgncol: Optional target column name for horizon designations.
-        metadata: Optional dictionary for metadata.
-        crs: Optional Coordinate Reference System information.
-        validate: If True (default), performs validation checks on initialization.
-
-    Returns:
-        A new SoilProfileCollection instance.
-    """
-    if not isinstance(data, pd.DataFrame):
-        raise TypeError("`data` must be a pandas DataFrame.")
-    if not isinstance(schema_template, dict):
-        raise TypeError("`schema_template` must be a dictionary.")
-
-    # Make a copy to avoid modifying the original DataFrame
-    processed_data = data.copy()
-
-    # Rename columns based on the schema template
-    processed_data.rename(columns=schema_template, inplace=True)
-
-    # For now, assume all data is horizon data and derive site data.
-    # A more advanced implementation will split site/horizon data based on the template.
-    horizons_df = processed_data
-
-    # A minimal site DataFrame will be created by the SPC constructor
-    site_df = None
-
-    return SoilProfileCollection(
-        horizons=horizons_df,
-        site=site_df,
-        idname=idname,
-        hzidname=hzidname,
-        depthcols=depthcols,
-        hzdesgncol=hzdesgncol,
-        metadata=metadata,
-        crs=crs,
-        validate=validate
-    )
-
 # --- SoilProfileCollection class ---
 
 class SoilProfileCollection:
+    @classmethod
+    def from_dataframe(
+        cls,
+        data: pd.DataFrame,
+        schema_template: Dict[str, str],
+        idname: str = 'id',
+        hzidname: str = 'hzid',
+        depthcols: Tuple[str, str] = ('top', 'bottom'),
+        hzdesgncol: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        crs: Optional[Any] = None,
+        validate: bool = True
+    ):
+        """
+        Creates a SoilProfileCollection object from a DataFrame based on a schema template.
+
+        Args:
+            data: DataFrame containing the soil profile data.
+            schema_template: A dictionary mapping source column names in `data`
+                             to the target column names required by SoilProfileCollection.
+                             Example: {'profile_id': 'id', 'horizon_top': 'top'}
+            idname: Target column name for profile IDs.
+            hzidname: Target column name for unique horizon IDs.
+            depthcols: Tuple of (top_depth_column_name, bottom_depth_column_name).
+            hzdesgncol: Optional target column name for horizon designations.
+            metadata: Optional dictionary for metadata.
+            crs: Optional Coordinate Reference System information.
+            validate: If True (default), performs validation checks on initialization.
+
+        Returns:
+            A new SoilProfileCollection instance.
+        """
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("`data` must be a pandas DataFrame.")
+        if not isinstance(schema_template, dict):
+            raise TypeError("`schema_template` must be a dictionary.")
+
+        # Make a copy to avoid modifying the original DataFrame
+        processed_data = data.copy()
+
+        # Rename columns based on the schema template
+        processed_data.rename(columns=schema_template, inplace=True)
+
+        # For now, assume all data is horizon data and derive site data.
+        # A more advanced implementation will split site/horizon data based on the template.
+        horizons_df = processed_data
+
+        # A minimal site DataFrame will be created by the SPC constructor
+        site_df = None
+
+        return cls(
+            horizons=horizons_df,
+            site=site_df,
+            idname=idname,
+            hzidname=hzidname,
+            depthcols=depthcols,
+            hzdesgncol=hzdesgncol,
+            metadata=metadata,
+            crs=crs,
+            validate=validate
+        )
     """
     Represents a collection of soil profiles, similar to aqp::SoilProfileCollection.
 
