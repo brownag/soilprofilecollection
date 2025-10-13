@@ -652,9 +652,10 @@ class SoilProfileCollection:
             selected_hz_groups = intermediate_horizons.groupby(
                 self.idname, sort=False, observed=True
             ).apply(
-                _select_hz_by_iloc, 
-                j_sel=j_selector, 
-                top_col=self._topcol 
+                _select_hz_by_iloc,
+                j_sel=j_selector,
+                top_col=self._topcol,
+                include_groups=False
             )
 
             if isinstance(selected_hz_groups.index, pd.MultiIndex):
