@@ -121,7 +121,7 @@ print(hz_data)
 #> 14   147  P004      C     C   35      80    12    65      7.0
 ```
 
-Once we hae a `DataFrame` containing site and horizon data, we
+Once we have `DataFrame`s containing site and horizon data, we
 instantiate the `SoilProfileCollection` object using the constructor:
 
 ``` python
@@ -134,6 +134,61 @@ spc = SoilProfileCollection(
   depthcols=('top','bottom'), # Tuple of (top_col, bottom_col)
   hzdesgncol='hzname'    # Column name for horizon designations (optional)
 )
+```
+
+Alternatively, if all your data is in a single `DataFrame`, you can use
+the `from_dataframe` class method. This is useful when your source data
+is not already split into site and horizon tables.
+
+You provide a `schema_template` to map your column names to the standard
+`SoilProfileCollection` names.
+
+``` python
+import pandas as pd
+from soilprofilecollection import SoilProfileCollection
+
+# --- Sample Combined Data with different column names ---
+# This is to demonstrate from_dataframe()
+combined_data_dict = {
+    'profile_id': ['P001', 'P001', 'P002', 'P002'],
+    'horizon_id': [1, 2, 3, 4],
+    'top_depth': [0, 10, 0, 20],
+    'bottom_depth': [10, 30, 20, 40],
+    'horizon_name': ['A', 'B', 'A', 'C'],
+    'site_group': ['A', 'A', 'B', 'B'],
+    'elevation': [100, 100, 120, 120]
+}
+combined_data = pd.DataFrame(combined_data_dict)
+
+# Define the schema template to map original names to SPC standard names
+schema = {
+    'profile_id': 'id',
+    'horizon_id': 'hzid',
+    'top_depth': 'top',
+    'bottom_depth': 'bottom',
+    'horizon_name': 'hzname'
+}
+
+# Create a SoilProfileCollection from the single dataframe
+spc_from_df = SoilProfileCollection.from_dataframe(
+    data=combined_data,
+    schema_template=schema,
+    idname='id',
+    hzidname='hzid',
+    depthcols=('top', 'bottom'),
+    hzdesgncol='hzname'
+)
+
+print(spc_from_df)
+#> <SoilProfileCollection> (2 profiles, 4 horizons)
+#>   Profile ID:   id
+#>   Horizon ID:   hzid
+#>   Depth Cols:   top (top), bottom (bottom)
+#>   Profile Top Depths:    [min: 0.0, mean: 0.0, max: 0.0]
+#>   Profile Bottom Depths: [min: 30.0, mean: 35.0, max: 40.0]
+#>   Hz Desgn Col: hzname
+#>   Site Vars:     (0 total)
+#>   Horizon Vars: id, hzid, top, bottom, hzname... (7 total)
 ```
 
 The `SoilProfileCollection` class has several properties and methods:
@@ -188,17 +243,15 @@ print(len(subset))
 #> 3
 
 subset2 = spc[0:3,0:2]
+#> /home/andrew/workspace/soilmcp/upstream/soilprofilecollection/soilprofilecollection/soil_profile_collection.py:654: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+#>   ).apply(
 print(len(subset))
 #> 3
 
 standard_intervals = [25, 50]
 x = subset.glom(intervals = standard_intervals)
-#> Note: Performing slicing (agg_fun=None). Truncate=False. Params 'v' and 'fill' ignored.
 y = subset.glom(intervals = standard_intervals, truncate = True)
-#> Note: Performing slicing (agg_fun=None). Truncate=True. Params 'v' and 'fill' ignored.
 z = subset.glom(intervals = standard_intervals, agg_fun = "dominant")
-#> Note: Performing aggregation with agg_fun='dominant'. Effective truncate=True (implicit via overlap). Fill=False.
-#> Note: Auto-detected columns for 'dominant': ['hzname', 'genhz', 'clay', 'sand', 'phfield']
 ```
 
 You can also create sketches of the data stored in the object using the
@@ -206,13 +259,12 @@ You can also create sketches of the data stored in the object using the
 
 ``` python
 ap = subset.plot(color="clay", label_hz=True) # Color by clay content
-#> Note: Mapping numeric column 'clay' to colormap 'viridis'.
 import matplotlib.pyplot as plt
 plt.suptitle("Sample SPC Plot (Colored by Clay %)")
 plt.show()
 ```
 
-<img src="assets/figures/README-spc-sketches-1.png" width="100%" />
+<img src="https://raw.githubusercontent.com/brownag/soilprofilecollection/main/assets/figures/README-spc-sketches-1.png" width="100%" />
 
 ``` python
 print(subset)
@@ -227,13 +279,12 @@ print(subset)
 #>   Horizon Vars: hzid, id, hzname, genhz, top... (9 total)
 
 ap2 = subset2.plot(color="clay", label_hz=True) # Color by clay content
-#> Note: Mapping numeric column 'clay' to colormap 'viridis'.
 import matplotlib.pyplot as plt
 plt.suptitle("Sample SPC Plot (Colored by Clay %)")
 plt.show()
 ```
 
-<img src="assets/figures/README-spc-sketches-2.png" width="100%" />
+<img src="https://raw.githubusercontent.com/brownag/soilprofilecollection/main/assets/figures/README-spc-sketches-2.png" width="100%" />
 
 ``` python
 print(subset2)
@@ -248,13 +299,12 @@ print(subset2)
 #>   Horizon Vars: hzid, id, hzname, genhz, top... (9 total)
 
 ax = x.plot(color="clay", label_hz=True) # Color by clay content
-#> Note: Mapping numeric column 'clay' to colormap 'viridis'.
 import matplotlib.pyplot as plt
 plt.suptitle("Sample SPC Plot (Colored by Clay %)")
 plt.show()
 ```
 
-<img src="assets/figures/README-spc-sketches-3.png" width="100%" />
+<img src="https://raw.githubusercontent.com/brownag/soilprofilecollection/main/assets/figures/README-spc-sketches-3.png" width="100%" />
 
 ``` python
 print(x)
@@ -269,13 +319,12 @@ print(x)
 #>   Horizon Vars: hzid, id, hzname, genhz, top... (10 total)
 
 ay = y.plot(color="clay", label_hz=True) # Color by clay content
-#> Note: Mapping numeric column 'clay' to colormap 'viridis'.
 import matplotlib.pyplot as plt
 plt.suptitle("Sample SPC Plot (Colored by Clay %)")
 plt.show()
 ```
 
-<img src="assets/figures/README-spc-sketches-4.png" width="100%" />
+<img src="https://raw.githubusercontent.com/brownag/soilprofilecollection/main/assets/figures/README-spc-sketches-4.png" width="100%" />
 
 ``` python
 print(y)
@@ -290,13 +339,12 @@ print(y)
 #>   Horizon Vars: hzid, id, hzname, genhz, top... (10 total)
 
 az = z.plot(color="clay", label_hz=True) # Color by clay content
-#> Note: Mapping numeric column 'clay' to colormap 'viridis'.
 import matplotlib.pyplot as plt
 plt.suptitle("Sample SPC Plot (Colored by Clay %)")
 plt.show()
 ```
 
-<img src="assets/figures/README-spc-sketches-5.png" width="100%" />
+<img src="https://raw.githubusercontent.com/brownag/soilprofilecollection/main/assets/figures/README-spc-sketches-5.png" width="100%" />
 
 ``` python
 print(z)

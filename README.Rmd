@@ -9,6 +9,7 @@ knitr::opts_chunk$set(
   fig.path = "assets/figures/README-",
   out.width = "100%"
 )
+knitr::opts_knit$set(base.url = "https://raw.githubusercontent.com/brownag/soilprofilecollection/main/")
 ```
 
 # Python SoilProfileCollection Module
@@ -108,7 +109,7 @@ hz_data = pd.DataFrame(hz_data_dict)
 print(hz_data)
 ```
 
-Once we hae a `DataFrame` containing site and horizon data, we instantiate the `SoilProfileCollection` object using the constructor:
+Once we have `DataFrame`s containing site and horizon data, we instantiate the `SoilProfileCollection` object using the constructor:
 
 ```{python spc-instantiate}
 # Instantiate the collection using the column names defined above
@@ -120,6 +121,49 @@ spc = SoilProfileCollection(
   depthcols=('top','bottom'), # Tuple of (top_col, bottom_col)
   hzdesgncol='hzname'    # Column name for horizon designations (optional)
 )
+```
+
+Alternatively, if all your data is in a single `DataFrame`, you can use the `from_dataframe` class method. This is useful when your source data is not already split into site and horizon tables.
+
+You provide a `schema_template` to map your column names to the standard `SoilProfileCollection` names.
+
+```{python spc-from-dataframe}
+import pandas as pd
+from soilprofilecollection import SoilProfileCollection
+
+# --- Sample Combined Data with different column names ---
+# This is to demonstrate from_dataframe()
+combined_data_dict = {
+    'profile_id': ['P001', 'P001', 'P002', 'P002'],
+    'horizon_id': [1, 2, 3, 4],
+    'top_depth': [0, 10, 0, 20],
+    'bottom_depth': [10, 30, 20, 40],
+    'horizon_name': ['A', 'B', 'A', 'C'],
+    'site_group': ['A', 'A', 'B', 'B'],
+    'elevation': [100, 100, 120, 120]
+}
+combined_data = pd.DataFrame(combined_data_dict)
+
+# Define the schema template to map original names to SPC standard names
+schema = {
+    'profile_id': 'id',
+    'horizon_id': 'hzid',
+    'top_depth': 'top',
+    'bottom_depth': 'bottom',
+    'horizon_name': 'hzname'
+}
+
+# Create a SoilProfileCollection from the single dataframe
+spc_from_df = SoilProfileCollection.from_dataframe(
+    data=combined_data,
+    schema_template=schema,
+    idname='id',
+    hzidname='hzid',
+    depthcols=('top', 'bottom'),
+    hzdesgncol='hzname'
+)
+
+print(spc_from_df)
 ```
 
 The `SoilProfileCollection` class has several properties and methods:
