@@ -1,6 +1,5 @@
 # soilprofilecollection 0.2.1
 
-- Pinned pandas version to `>=2.2.3` to ensure access to modern APIs.
 - Resolved a `FutureWarning` in `pandas` by explicitly setting `include_groups=False` in a `groupby().apply()` call.
 
 # soilprofilecollection 0.2.0
