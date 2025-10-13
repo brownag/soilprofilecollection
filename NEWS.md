@@ -1,3 +1,8 @@
+# soilprofilecollection 0.2.0
+ -  Added pytest test suite with fixtures and test coverage for core functionality
+ -  Added `.from_dataframe()` utility function for schema-based data import
+ -  Removed debug print statements throughout the codebase and streamlined error handling
+
 # soilprofilecollection 0.1.0
 
  - Basic implementation of SoilProfileCollection object
