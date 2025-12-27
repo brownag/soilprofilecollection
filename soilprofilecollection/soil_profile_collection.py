@@ -246,9 +246,9 @@ class SoilProfileCollection:
         cls,
         data: pd.DataFrame,
         schema_template: Dict[str, str],
-        idname: str = "id",
-        hzidname: str = "hzid",
-        depthcols: Tuple[str, str] = ("top", "bottom"),
+        idname: Optional[str] = None,
+        hzidname: Optional[str] = None,
+        depthcols: Optional[Tuple[str, str]] = None,
         hzdesgncol: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         crs: Optional[Any] = None,
@@ -261,22 +261,57 @@ class SoilProfileCollection:
             data: DataFrame containing the soil profile data.
             schema_template: A dictionary mapping source column names in `data`
                              to the target column names required by SoilProfileCollection.
-                             Example: {'profile_id': 'id', 'horizon_top': 'top'}
-            idname: Target column name for profile IDs.
-            hzidname: Target column name for unique horizon IDs.
-            depthcols: Tuple of (top_depth_column_name, bottom_depth_column_name).
-            hzdesgncol: Optional target column name for horizon designations.
+                             Example: {'profile_id': 'id', 'hz_id': 'hzid', 'top_depth': 'top',
+                                       'bottom_depth': 'bottom', 'hz_name': 'hzname'}
+            idname: Target column name for profile IDs. If None, inferred from schema_template.
+            hzidname: Target column name for unique horizon IDs. If None, inferred from schema.
+            depthcols: Tuple of (top, bottom) column names. If None, inferred from schema.
+            hzdesgncol: Optional target column name for horizon designations. If None, inferred.
             metadata: Optional dictionary for metadata.
             crs: Optional Coordinate Reference System information.
             validate: If True (default), performs validation checks on initialization.
 
         Returns:
             A new SoilProfileCollection instance.
+
+        Example:
+            >>> schema = {
+            ...     'profile_id': 'id',
+            ...     'hz_id': 'hzid',
+            ...     'top_depth': 'top',
+            ...     'bottom_depth': 'bottom',
+            ...     'hz_name': 'hzname'
+            ... }
+            >>> spc = SoilProfileCollection.from_dataframe(df, schema)
         """
         if not isinstance(data, pd.DataFrame):
             raise TypeError("`data` must be a pandas DataFrame.")
         if not isinstance(schema_template, dict):
             raise TypeError("`schema_template` must be a dictionary.")
+
+        # Infer standard column names from schema_template if not provided
+        # The schema maps source_name -> target_name, so check if standard names are in values
+        inferred_standard_names = set(schema_template.values())
+
+        # Infer idname (look for mapping to 'id')
+        if idname is None:
+            idname = "id" if "id" in inferred_standard_names else "id"
+
+        # Infer hzidname (look for mapping to 'hzid')
+        if hzidname is None:
+            hzidname = "hzid" if "hzid" in inferred_standard_names else "hzid"
+
+        # Infer depthcols (look for mappings to 'top' and 'bottom')
+        if depthcols is None:
+            has_top = "top" in inferred_standard_names
+            has_bottom = "bottom" in inferred_standard_names
+            top_col = "top" if has_top else "top"
+            bottom_col = "bottom" if has_bottom else "bottom"
+            depthcols = (top_col, bottom_col)
+
+        # Infer hzdesgncol (look for mapping to 'hzname')
+        if hzdesgncol is None:
+            hzdesgncol = "hzname" if "hzname" in inferred_standard_names else None
 
         # Make a copy to avoid modifying the original DataFrame
         processed_data = data.copy()
