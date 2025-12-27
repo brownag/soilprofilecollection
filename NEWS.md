@@ -1,3 +1,13 @@
+# soilprofilecollection 0.3.0
+
+- **BREAKING**: matplotlib is now an optional dependency. Install with `pip install soilprofilecollection[plot]` to use the `.plot()` method.
+  - Updated README with installation instructions for both basic and plotting modes
+- mkdocstrings-python moved to dev dependencies (only needed for building documentation)
+- Improved `.from_dataframe()`: now automatically infers standard column names from schema template
+  - No need to repeat `idname`, `hzidname`, `depthcols`, and `hzdesgncol` parameters
+- Fixed slicing bug in `__getitem__` where profile ID column was dropped when selecting specific horizons within profiles
+
+
 # soilprofilecollection 0.2.1
 
 - Resolved a `FutureWarning` in `pandas` by explicitly setting `include_groups=False` in a `groupby().apply()` call.

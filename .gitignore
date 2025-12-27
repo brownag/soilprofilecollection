@@ -8,3 +8,5 @@ soilprofilecollection.Rproj
 site
 dist
 .venv
+.coverage
+tests/__pycache__/

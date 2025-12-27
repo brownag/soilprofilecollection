@@ -10,12 +10,42 @@ A Python implementation of the *SoilProfileCollection* object from the
 
 For now you can install `soilprofilecollection` directly from GitHub.
 
-For instance, add it to an existing project using
-[`poetry`](https://python-poetry.org/docs/):
+## Basic Installation
+
+For core functionality without visualization:
 
 ``` sh
 poetry add git+https://github.com/brownag/soilprofilecollection.git
 ```
+
+Or using pip:
+
+``` sh
+pip install git+https://github.com/brownag/soilprofilecollection.git
+```
+
+## With Plotting Support
+
+To use the `.plot()` method to visualize soil profiles, install the
+optional `plot` extra:
+
+Using [`poetry`](https://python-poetry.org/docs/):
+
+``` sh
+poetry add git+https://github.com/brownag/soilprofilecollection.git -E plot
+```
+
+Or using pip:
+
+``` sh
+pip install git+https://github.com/brownag/soilprofilecollection.git[plot]
+```
+
+## Note on Plotting
+
+The `.plot()` method requires matplotlib. If you attempt to use
+`.plot()` without installing the `plot` extra, you will receive an error
+message with installation instructions.
 
 # Examples
 
@@ -154,9 +184,7 @@ combined_data_dict = {
     'horizon_id': [1, 2, 3, 4],
     'top_depth': [0, 10, 0, 20],
     'bottom_depth': [10, 30, 20, 40],
-    'horizon_name': ['A', 'B', 'A', 'C'],
-    'site_group': ['A', 'A', 'B', 'B'],
-    'elevation': [100, 100, 120, 120]
+    'hz_name': ['A', 'B', 'A', 'C']
 }
 combined_data = pd.DataFrame(combined_data_dict)
 
@@ -166,17 +194,14 @@ schema = {
     'horizon_id': 'hzid',
     'top_depth': 'top',
     'bottom_depth': 'bottom',
-    'horizon_name': 'hzname'
+    'hz_name': 'hzname'
 }
 
 # Create a SoilProfileCollection from the single dataframe
+# Note: idname, hzidname, depthcols, and hzdesgncol are automatically inferred from the schema
 spc_from_df = SoilProfileCollection.from_dataframe(
     data=combined_data,
-    schema_template=schema,
-    idname='id',
-    hzidname='hzid',
-    depthcols=('top', 'bottom'),
-    hzdesgncol='hzname'
+    schema_template=schema
 )
 
 print(spc_from_df)
@@ -188,10 +213,43 @@ print(spc_from_df)
 #>   Profile Bottom Depths: [min: 30.0, mean: 35.0, max: 40.0]
 #>   Hz Desgn Col: hzname
 #>   Site Vars:     (0 total)
-#>   Horizon Vars: id, hzid, top, bottom, hzname... (7 total)
+#>   Horizon Vars: id, hzid, top, bottom, hzname (5 total)
 ```
 
 The `SoilProfileCollection` class has several properties and methods:
+
+``` python
+# Inspect data in site and horizons
+print("\nsite_data type:", type(site_data))
+#> 
+#> site_data type: <class 'pandas.core.frame.DataFrame'>
+print("site_data head:")
+#> site_data head:
+print(site_data.head())
+#>      id group  elev  slope_field  aspect_field
+#> 0  P001     A  1154            4           330
+#> 1  P002     B  1158            3           290
+#> 2  P003     B  1156            5            40
+#> 3  P004     A  1150            6            90
+print("site_data columns:", site_data.columns.tolist())
+#> site_data columns: ['id', 'group', 'elev', 'slope_field', 'aspect_field']
+
+print("hz_data type:", type(hz_data))
+#> hz_data type: <class 'pandas.core.frame.DataFrame'>
+print("hz_data shape:", hz_data.shape)
+#> hz_data shape: (15, 9)
+print("hz_data columns:", hz_data.columns.tolist())
+#> hz_data columns: ['hzid', 'id', 'hzname', 'genhz', 'top', 'bottom', 'clay', 'sand', 'phfield']
+print("hz_data head:")
+#> hz_data head:
+print(hz_data.head())
+#>    hzid    id hzname genhz  top  bottom  clay  sand  phfield
+#> 0   133  P001     Ap     A    0      18    21    54      6.2
+#> 1   134  P001      A     A   18      30    20    53      6.0
+#> 2   135  P001    ABt     A   30      46    24    50      5.9
+#> 3   136  P001    Bt1     B   46      61    26    48      5.9
+#> 4   137  P001    Bt2     B   61      91    27    47      6.1
+```
 
 ``` python
 print(spc)
@@ -243,9 +301,7 @@ print(len(subset))
 #> 3
 
 subset2 = spc[0:3,0:2]
-#> /home/andrew/workspace/soilmcp/upstream/soilprofilecollection/soilprofilecollection/soil_profile_collection.py:654: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
-#>   ).apply(
-print(len(subset))
+print(len(subset2))
 #> 3
 
 standard_intervals = [25, 50]
@@ -296,7 +352,7 @@ print(subset2)
 #>   Profile Bottom Depths: [min: 30.0, mean: 36.3, max: 41.0]
 #>   Hz Desgn Col: hzname
 #>   Site Vars:    id, group, elev, slope_field, aspect_field (5 total)
-#>   Horizon Vars: hzid, id, hzname, genhz, top... (9 total)
+#>   Horizon Vars: id, hzid, hzname, genhz, top... (9 total)
 
 ax = x.plot(color="clay", label_hz=True) # Color by clay content
 import matplotlib.pyplot as plt
