@@ -716,7 +716,12 @@ class SoilProfileCollection:
             )
 
             if isinstance(selected_hz_groups.index, pd.MultiIndex):
-                new_horizons = selected_hz_groups.reset_index(level=0, drop=True)
+                new_horizons = selected_hz_groups.reset_index(level=0)
+                
+                if new_horizons.columns[0] == self.idname:
+                    pass 
+                else:
+                    new_horizons = new_horizons.rename(columns={new_horizons.columns[0]: self.idname})
             else:
                 new_horizons = selected_hz_groups
 
