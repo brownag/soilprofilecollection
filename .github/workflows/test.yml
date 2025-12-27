@@ -20,6 +20,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: "without optional extras"
+            install-extras: ""
+          - name: "with plot extra"
+            install-extras: "-E plot"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,8 +47,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
-      - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ matrix.install-extras }}-${{ hashFiles('**/poetry.lock') }}
+      - name: Install dependencies ${{ matrix.name }}
+        run: poetry install --no-interaction --no-root ${{ matrix.install-extras }}
       - name: Run tests
         run: poetry run pytest
