@@ -22,11 +22,39 @@ A Python implementation of the _SoilProfileCollection_ object from the [R packag
 
 For now you can install `soilprofilecollection` directly from GitHub.
 
-For instance, add it to an existing project using [`poetry`](https://python-poetry.org/docs/):
+## Basic Installation
+
+For core functionality without visualization:
 
 ```{sh, eval=FALSE}
 poetry add git+https://github.com/brownag/soilprofilecollection.git
 ```
+
+Or using pip:
+
+```{sh, eval=FALSE}
+pip install git+https://github.com/brownag/soilprofilecollection.git
+```
+
+## With Plotting Support
+
+To use the `.plot()` method to visualize soil profiles, install the optional `plot` extra:
+
+Using [`poetry`](https://python-poetry.org/docs/):
+
+```{sh, eval=FALSE}
+poetry add git+https://github.com/brownag/soilprofilecollection.git -E plot
+```
+
+Or using pip:
+
+```{sh, eval=FALSE}
+pip install git+https://github.com/brownag/soilprofilecollection.git[plot]
+```
+
+## Note on Plotting
+
+The `.plot()` method requires matplotlib. If you attempt to use `.plot()` without installing the `plot` extra, you will receive an error message with installation instructions.
 
 # Examples
 
@@ -138,9 +166,7 @@ combined_data_dict = {
     'horizon_id': [1, 2, 3, 4],
     'top_depth': [0, 10, 0, 20],
     'bottom_depth': [10, 30, 20, 40],
-    'horizon_name': ['A', 'B', 'A', 'C'],
-    'site_group': ['A', 'A', 'B', 'B'],
-    'elevation': [100, 100, 120, 120]
+    'hz_name': ['A', 'B', 'A', 'C']
 }
 combined_data = pd.DataFrame(combined_data_dict)
 
@@ -150,23 +176,34 @@ schema = {
     'horizon_id': 'hzid',
     'top_depth': 'top',
     'bottom_depth': 'bottom',
-    'horizon_name': 'hzname'
+    'hz_name': 'hzname'
 }
 
 # Create a SoilProfileCollection from the single dataframe
+# Note: idname, hzidname, depthcols, and hzdesgncol are automatically inferred from the schema
 spc_from_df = SoilProfileCollection.from_dataframe(
     data=combined_data,
-    schema_template=schema,
-    idname='id',
-    hzidname='hzid',
-    depthcols=('top', 'bottom'),
-    hzdesgncol='hzname'
+    schema_template=schema
 )
 
 print(spc_from_df)
 ```
 
 The `SoilProfileCollection` class has several properties and methods:
+
+```{python spc-debug}
+# Inspect data in site and horizons
+print("\nsite_data type:", type(site_data))
+print("site_data head:")
+print(site_data.head())
+print("site_data columns:", site_data.columns.tolist())
+
+print("hz_data type:", type(hz_data))
+print("hz_data shape:", hz_data.shape)
+print("hz_data columns:", hz_data.columns.tolist())
+print("hz_data head:")
+print(hz_data.head())
+```
 
 ```{python spc-methods}
 print(spc)
@@ -179,7 +216,7 @@ subset = spc[0:3] # Get first 3 profiles
 print(len(subset))
 
 subset2 = spc[0:3,0:2]
-print(len(subset))
+print(len(subset2))
 
 standard_intervals = [25, 50]
 x = subset.glom(intervals = standard_intervals)
