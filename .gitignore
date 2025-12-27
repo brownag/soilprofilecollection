@@ -8,3 +8,4 @@ soilprofilecollection.Rproj
 site
 dist
 .venv
+.coverage
