@@ -6,10 +6,6 @@
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib.cm as cm
-import matplotlib.colors as colors
 from typing import List, Union, Optional, Tuple, Dict, Any, Callable
 
 # --- Helper Functions ---
@@ -875,10 +871,13 @@ class SoilProfileCollection:
              label_hz: bool = True,
              label_offset: float = 0.05,
              figsize: Optional[Tuple[float, float]] = None,
-             ax: Optional[plt.Axes] = None,
-             **kwargs) -> plt.Axes:
+             ax: Optional['Any'] = None,
+             **kwargs) -> 'Any':
         """
         Creates a simple sketch of the soil profiles.
+
+        Note: This method requires matplotlib. Install with:
+            pip install soilprofilecollection[plot]
 
         Args:
             n: Maximum number of profiles to plot. If None, plots all.
@@ -907,6 +906,18 @@ class SoilProfileCollection:
         Returns:
             The matplotlib Axes object containing the plot.
         """
+        # Lazy import matplotlib (only when plot() is called)
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.patches as patches
+            import matplotlib.cm as cm
+            import matplotlib.colors as colors
+        except ImportError as e:
+            raise ImportError(
+                "The plot() method requires matplotlib. "
+                "Install with: pip install soilprofilecollection[plot]"
+            ) from e
+
         if ax is None:
             # Adjust default figsize calculation slightly
             num_profiles_to_plot = min(len(self), n) if n is not None else len(self)

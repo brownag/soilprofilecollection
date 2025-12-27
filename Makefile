@@ -1,14 +1,25 @@
-.PHONY: help install install-dev test test-cov test-integration lint format format-check docs docs-serve clean build pre-commit-install pre-commit-run examples
+.PHONY: help all install install-dev install-plot install-dev-plot install-prod test test-cov test-integration lint format format-check docs docs-serve clean build pre-commit-install pre-commit-run examples shell update
 .DEFAULT_GOAL := help
 
 help: ## Show this help message
 	@echo "Available commands:"
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  %-15s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-install: ## Install the package in development mode
+all: format lint test-cov build ## Run format, lint, tests (with coverage), and build
+
+install: ## Install the package in development mode (without plot/visualization)
 	poetry install
 
-install-prod: ## Install only production dependencies
+install-dev: ## Install with dev dependencies (tests, linting, docs)
+	poetry install --with=dev
+
+install-plot: ## Install with plot/visualization support
+	poetry install -E plot
+
+install-dev-plot: ## Install with dev dependencies AND plot/visualization support
+	poetry install --with=dev -E plot
+
+install-prod: ## Install only production dependencies (minimal)
 	poetry install --only=main
 
 test: ## Run the test suite
@@ -60,11 +71,12 @@ pre-commit-run: ## Run pre-commit on all files
 examples: ## Run example scripts (basic functionality test)
 	@echo "Testing basic examples..."
 	@poetry run python -c "import soilprofilecollection; print('✓ Package imports successfully')"
+	@poetry run python -c "from soilprofilecollection import SoilProfileCollection; print('✓ SoilProfileCollection imports successfully')"
+	@python -c "import matplotlib" 2>/dev/null && echo "✓ Matplotlib is installed (plotting available)" || echo "ℹ Matplotlib not installed (install with: make install-plot)"
 	@echo "✓ All examples completed successfully"
 
 shell: ## Start a Poetry shell
 	poetry shell
 
 update: ## Update dependencies
-	poetry update</content>
-<parameter name="filePath">/home/andrew/workspace/soilmcp/upstream/soilprofilecollection/Makefile
+	poetry update

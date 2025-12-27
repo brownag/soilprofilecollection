@@ -1,3 +1,10 @@
+# soilprofilecollection 0.3.0
+
+- **BREAKING**: matplotlib is now an optional dependency. Install with `pip install soilprofilecollection[plot]` to use the `.plot()` method.
+  - Updated README with installation instructions for both basic and plotting modes
+- mkdocstrings-python moved to dev dependencies (only needed for building documentation)
+
+
 # soilprofilecollection 0.2.1
 
 - Resolved a `FutureWarning` in `pandas` by explicitly setting `include_groups=False` in a `groupby().apply()` call.

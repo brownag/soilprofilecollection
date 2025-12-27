@@ -10,12 +10,39 @@ A Python implementation of the *SoilProfileCollection* object from the
 
 For now you can install `soilprofilecollection` directly from GitHub.
 
-For instance, add it to an existing project using
-[`poetry`](https://python-poetry.org/docs/):
+## Basic Installation
+
+For core functionality (without visualization):
 
 ``` sh
 poetry add git+https://github.com/brownag/soilprofilecollection.git
 ```
+
+Or using pip:
+
+``` sh
+pip install git+https://github.com/brownag/soilprofilecollection.git
+```
+
+## With Plotting Support
+
+To use the `.plot()` method to visualize soil profiles, install the optional `plot` extra:
+
+Using [`poetry`](https://python-poetry.org/docs/):
+
+``` sh
+poetry add git+https://github.com/brownag/soilprofilecollection.git -E plot
+```
+
+Or using pip:
+
+``` sh
+pip install git+https://github.com/brownag/soilprofilecollection.git[plot]
+```
+
+## Note on Plotting
+
+The `.plot()` method requires matplotlib. If you attempt to use `.plot()` without installing the `plot` extra, you will receive an error message with installation instructions.
 
 # Examples
 

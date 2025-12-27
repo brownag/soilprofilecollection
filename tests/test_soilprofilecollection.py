@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import pytest
-import matplotlib.axes
 
 from soilprofilecollection import SoilProfileCollection
 
@@ -125,8 +124,26 @@ def test_glom(sample_spc):
 
 def test_plot(sample_spc):
     """Tests that the plot method runs without errors and returns an Axes object."""
+    # Skip test if matplotlib is not installed
+    matplotlib = pytest.importorskip("matplotlib")
+    import matplotlib.axes
+
     ax = sample_spc.plot(color='color')
     assert isinstance(ax, matplotlib.axes.Axes)
+
+
+def test_plot_without_matplotlib(sample_spc, monkeypatch):
+    """Tests that plot() raises helpful error when matplotlib not installed."""
+    # Temporarily hide matplotlib
+    import sys
+    monkeypatch.setitem(sys.modules, 'matplotlib', None)
+    monkeypatch.setitem(sys.modules, 'matplotlib.pyplot', None)
+    monkeypatch.setitem(sys.modules, 'matplotlib.patches', None)
+    monkeypatch.setitem(sys.modules, 'matplotlib.cm', None)
+    monkeypatch.setitem(sys.modules, 'matplotlib.colors', None)
+
+    with pytest.raises(ImportError, match="requires matplotlib"):
+        sample_spc.plot(color='color')
 
 def test_from_dataframe():
     """Tests creating an SPC from a DataFrame."""
