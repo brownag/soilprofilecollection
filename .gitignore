@@ -7,6 +7,7 @@ README.html
 soilprofilecollection.Rproj
 site
 dist
+venv
 .venv
 .coverage
 tests/__pycache__/

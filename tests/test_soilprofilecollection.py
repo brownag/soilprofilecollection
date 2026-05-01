@@ -112,10 +112,14 @@ def test_profile_apply(sample_spc):
 
     mean_clay_per_profile = sample_spc.profile_apply(mean_clay)
     assert isinstance(mean_clay_per_profile, pd.Series)
-    expected_p1_mean = sample_spc.horizons[sample_spc.horizons["id"] == "P1"]["clay"].mean()
+    expected_p1_mean = sample_spc.horizons[sample_spc.horizons["id"] == "P1"][
+        "clay"
+    ].mean()
     assert mean_clay_per_profile["P1"] == pytest.approx(expected_p1_mean)
 
-    expected_p2_mean = sample_spc.horizons[sample_spc.horizons["id"] == "P2"]["clay"].mean()
+    expected_p2_mean = sample_spc.horizons[sample_spc.horizons["id"] == "P2"][
+        "clay"
+    ].mean()
     assert mean_clay_per_profile["P2"] == pytest.approx(expected_p2_mean)
 
 
@@ -123,14 +127,24 @@ def test_validation_errors():
     """Tests that the SPC raises errors for invalid horizon data."""
     # Overlapping horizons
     p_overlap_horizons = pd.DataFrame(
-        {"id": ["P_overlap"] * 2, "hzid": ["HO1", "HO2"], "top": [0, 10], "bottom": [15, 20]}
+        {
+            "id": ["P_overlap"] * 2,
+            "hzid": ["HO1", "HO2"],
+            "top": [0, 10],
+            "bottom": [15, 20],
+        }
     )
     with pytest.raises(ValueError, match="has overlapping horizons"):
         SoilProfileCollection(p_overlap_horizons, idname="id", hzidname="hzid")
 
     # Gap in horizons
     p_gap_horizons = pd.DataFrame(
-        {"id": ["P_gap"] * 2, "hzid": ["HG1", "HG2"], "top": [0, 20], "bottom": [10, 30]}
+        {
+            "id": ["P_gap"] * 2,
+            "hzid": ["HG1", "HG2"],
+            "top": [0, 20],
+            "bottom": [10, 30],
+        }
     )
     with pytest.raises(ValueError, match="has depth gaps between horizons"):
         SoilProfileCollection(p_gap_horizons, idname="id", hzidname="hzid")
@@ -206,3 +220,68 @@ def test_from_dataframe():
     assert spc.depthcols == ("top", "bottom")
     assert "prop" in spc.horizons.columns
     assert spc.horizons.shape[0] == 3
+
+
+def test_from_dataframe_respects_user_idname():
+    """Tests that from_dataframe() respects user-provided idname parameter.
+
+    Regression test for the bug where idname was always defaulted to "id"
+    regardless of what the schema mapped. The user-provided idname should
+    be used as the target column name in the schema.
+    """
+    source_data = pd.DataFrame(
+        {
+            "cokey": ["P1", "P1", "P2"],
+            "chkey": [1, 2, 3],
+            "hzdept_r": [0, 10, 0],
+            "hzdepb_r": [10, 25, 15],
+            "clay": [5, 8, 9],
+        }
+    )
+    # Schema maps to custom target names that match the user-provided idname
+    schema = {
+        "cokey": "cokey",
+        "chkey": "chkey",
+        "hzdept_r": "hzdept",
+        "hzdepb_r": "hzdepb",
+    }
+
+    spc = SoilProfileCollection.from_dataframe(
+        source_data,
+        schema,
+        idname="cokey",
+        hzidname="chkey",
+        depthcols=("hzdept", "hzdepb"),
+    )
+
+    assert spc.idname == "cokey"
+    assert spc.hzidname == "chkey"
+    assert spc.depthcols == ("hzdept", "hzdepb")
+    assert "cokey" in spc.horizons.columns
+    assert "chkey" in spc.horizons.columns
+    assert "hzdept" in spc.horizons.columns
+    assert "hzdepb" in spc.horizons.columns
+
+
+def test_from_dataframe_missing_schema_values_raises():
+    """Tests that from_dataframe() raises ValueError when required
+    standard column names are missing from the schema template.
+    """
+    source_data = pd.DataFrame(
+        {
+            "profile_id": ["P1", "P1", "P2"],
+            "h_id": [1, 2, 3],
+            "d_top": [0, 10, 0],
+            "d_bottom": [10, 25, 15],
+        }
+    )
+    # Schema missing 'id' mapping
+    schema = {"h_id": "hzid", "d_top": "top", "d_bottom": "bottom"}
+
+    with pytest.raises(ValueError, match="'id' column name not found"):
+        SoilProfileCollection.from_dataframe(source_data, schema)
+
+    # Schema missing 'top' and 'bottom' mappings
+    schema2 = {"profile_id": "id", "h_id": "hzid"}
+    with pytest.raises(ValueError, match="Both 'top' and 'bottom'"):
+        SoilProfileCollection.from_dataframe(source_data, schema2)

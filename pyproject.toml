@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "soilprofilecollection"
-version = "0.3.0"
+version = "0.3.1"
 description = "A 'Python' implementation of the 'SoilProfileCollection' object from the 'R' package 'aqp'"
 authors = ["Andrew Gene Brown <brown.andrewg@gmail.com>"]
 readme = "README.md"
@@ -17,6 +17,9 @@ plot = ["matplotlib"]
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8,<10"
 mkdocstrings-python = "^1.16.8"
+ruff = "^0.12.0"
+mypy = "^1.15.0"
+pytest-cov = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]

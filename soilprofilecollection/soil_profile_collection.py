@@ -38,7 +38,9 @@ def _validate_depths(
     # Check top <= bottom
     invalid_thickness = horizons_df[horizons_df[topcol] > horizons_df[bottomcol]]
     if not invalid_thickness.empty:
-        errors.append(f"Found {len(invalid_thickness)} horizons where top depth > bottom depth.")
+        errors.append(
+            f"Found {len(invalid_thickness)} horizons where top depth > bottom depth."
+        )
 
     # Check for gaps and overlaps within profiles
     for profile_id, horizons in horizons_df.groupby(idname):
@@ -77,7 +79,9 @@ def _validate_depths(
         # Check for duplicated depths within a profile (e.g., two horizons 0-10)
         depth_pairs = horizons[[topcol, bottomcol]].apply(tuple, axis=1)
         if depth_pairs.duplicated().any():
-            errors.append(f"Profile ID '{profile_id}' has horizons with identical depth ranges.")
+            errors.append(
+                f"Profile ID '{profile_id}' has horizons with identical depth ranges."
+            )
 
     return errors
 
@@ -143,10 +147,14 @@ def _glom_single_profile(
                             # Update min/max (already handles first value correctly)
                             current_mins[var] = min(current_mins[var], value)
                             current_maxs[var] = max(current_maxs[var], value)
-                            seen_valid[var] = True  # Mark that we saw at least one value
+                            seen_valid[var] = (
+                                True  # Mark that we saw at least one value
+                            )
                         if agg_fun == "dominant":
                             # Store contribution: (thickness, value)
-                            dominant_contributors[var].append((overlap_thickness, value))
+                            dominant_contributors[var].append(
+                                (overlap_thickness, value)
+                            )
                             seen_valid[var] = True  # Mark seen for dominant context too
 
         # --- Finalize calculation for the slice based on agg_fun ---
@@ -226,7 +234,9 @@ def _slice_single_profile(
 
                     # Check if this segment overlaps the very last interval
                     if z_bottom == last_interval_bottom and h_bottom > z_bottom:
-                        segment_bottom = h_bottom  # Extend bottom to original horizon bottom
+                        segment_bottom = (
+                            h_bottom  # Extend bottom to original horizon bottom
+                        )
 
                 # Create the segment record
                 new_segment_data = hz_row.to_dict()
@@ -293,20 +303,33 @@ class SoilProfileCollection:
         # The schema maps source_name -> target_name, so check if standard names are in values
         inferred_standard_names = set(schema_template.values())
 
-        # Infer idname (look for mapping to 'id')
+        # Infer idname from schema values, respecting user-provided value
         if idname is None:
-            idname = "id" if "id" in inferred_standard_names else "id"
+            idname = "id" if "id" in inferred_standard_names else None
+            if idname is None:
+                raise ValueError(
+                    "'id' column name not found in schema_template. "
+                    "Either add 'id' to your schema values or pass idname explicitly."
+                )
 
-        # Infer hzidname (look for mapping to 'hzid')
+        # Infer hzidname from schema values, respecting user-provided value
         if hzidname is None:
-            hzidname = "hzid" if "hzid" in inferred_standard_names else "hzid"
+            hzidname = "hzid" if "hzid" in inferred_standard_names else None
+            if hzidname is None:
+                raise ValueError(
+                    "'hzid' column name not found in schema_template. "
+                    "Either add 'hzid' to your schema values or pass hzidname explicitly."
+                )
 
-        # Infer depthcols (look for mappings to 'top' and 'bottom')
+        # Infer depthcols from schema values, respecting user-provided value
         if depthcols is None:
-            has_top = "top" in inferred_standard_names
-            has_bottom = "bottom" in inferred_standard_names
-            top_col = "top" if has_top else "top"
-            bottom_col = "bottom" if has_bottom else "bottom"
+            top_col = "top" if "top" in inferred_standard_names else None
+            bottom_col = "bottom" if "bottom" in inferred_standard_names else None
+            if top_col is None or bottom_col is None:
+                raise ValueError(
+                    "Both 'top' and 'bottom' column names must be in schema_template. "
+                    "Either add 'top' and 'bottom' to your schema values or pass depthcols explicitly."
+                )
             depthcols = (top_col, bottom_col)
 
         # Infer hzdesgncol (look for mapping to 'hzname')
@@ -398,7 +421,9 @@ class SoilProfileCollection:
             and isinstance(depthcols[0], str)
             and isinstance(depthcols[1], str)
         ):
-            raise TypeError("`depthcols` must be a list or tuple of two strings (top, bottom).")
+            raise TypeError(
+                "`depthcols` must be a list or tuple of two strings (top, bottom)."
+            )
         if hzdesgncol is not None and not isinstance(hzdesgncol, str):
             raise TypeError("`hzdesgncol` must be a string or None.")
 
@@ -429,13 +454,17 @@ class SoilProfileCollection:
 
         # Check horizon ID uniqueness
         if not h[self._hzidname].is_unique:
-            raise ValueError(f"Horizon ID column ('{self._hzidname}') contains duplicate values.")
+            raise ValueError(
+                f"Horizon ID column ('{self._hzidname}') contains duplicate values."
+            )
 
         # Set horizon index
         try:
             h = h.set_index(self._hzidname, drop=False)  # Keep column for reference
         except KeyError:
-            raise KeyError(f"Horizon ID column ('{self._hzidname}') not found in horizons data.")
+            raise KeyError(
+                f"Horizon ID column ('{self._hzidname}') not found in horizons data."
+            )
         h.index.name = f"{self._hzidname}_idx"  # Avoid clash if hzidname is index name
 
         self._horizons = h
@@ -450,7 +479,9 @@ class SoilProfileCollection:
             s = site.copy()
             # Check required site column
             if self._idname not in s.columns:
-                raise KeyError(f"Site data missing required profile ID column: '{self._idname}'")
+                raise KeyError(
+                    f"Site data missing required profile ID column: '{self._idname}'"
+                )
 
             # Check site ID uniqueness
             if s[self._idname].duplicated().any():
@@ -460,9 +491,13 @@ class SoilProfileCollection:
 
             # Set site index
             try:
-                s = s.set_index(self._idname, drop=False)  # Keep column for potential joins
+                s = s.set_index(
+                    self._idname, drop=False
+                )  # Keep column for potential joins
             except KeyError:
-                raise KeyError(f"Profile ID column ('{self._idname}') not found in site data.")
+                raise KeyError(
+                    f"Profile ID column ('{self._idname}') not found in site data."
+                )
             s.index.name = f"{self._idname}_idx"  # Avoid clash
 
             self._site = s
@@ -490,7 +525,9 @@ class SoilProfileCollection:
                 self._horizons, self._idname, self._topcol, self._bottomcol
             )
             if depth_errors:
-                raise ValueError("Depth validation failed:\n- " + "\n- ".join(depth_errors))
+                raise ValueError(
+                    "Depth validation failed:\n- " + "\n- ".join(depth_errors)
+                )
 
         # Store profile IDs for quick access
         self._profile_ids = self._site.index.tolist()
@@ -556,7 +593,9 @@ class SoilProfileCollection:
         repr_str = f"<SoilProfileCollection> ({n_prof} profiles, {n_hz} horizons)\n"
         repr_str += f"  Profile ID:   {self.idname}\n"
         repr_str += f"  Horizon ID:   {self.hzidname}\n"
-        repr_str += f"  Depth Cols:   {self.depthcols[0]} (top), {self.depthcols[1]} (bottom)\n"
+        repr_str += (
+            f"  Depth Cols:   {self.depthcols[0]} (top), {self.depthcols[1]} (bottom)\n"
+        )
 
         # --- Updated Depth Range Calculation using self.depths() DataFrames ---
         min_depth_str = "Not computed"
@@ -625,7 +664,9 @@ class SoilProfileCollection:
             repr_str += f"  Hz Desgn Col: {self.hzdesgncol}\n"
         if self.crs:
             crs_str = str(self.crs)
-            repr_str += f"  CRS:          {crs_str[:60]}{'...' if len(crs_str) > 60 else ''}\n"
+            repr_str += (
+                f"  CRS:          {crs_str[:60]}{'...' if len(crs_str) > 60 else ''}\n"
+            )
         site_cols = list(self._site.columns)
         hz_cols = list(self._horizons.columns)
         site_cols_display = [c for c in site_cols if c != self._site.index.name]
@@ -682,7 +723,9 @@ class SoilProfileCollection:
             elif len(key) == 1:
                 i_selector = key[0]
             else:
-                raise TypeError("Subsetting key tuple must have 1 or 2 elements (i, [j]).")
+                raise TypeError(
+                    "Subsetting key tuple must have 1 or 2 elements (i, [j])."
+                )
 
         # --- 1. Process `i` selector (Profile Selection) ---
         selected_profile_ids: List[Any]
@@ -711,9 +754,13 @@ class SoilProfileCollection:
                         f"Boolean mask length mismatch ({len(i_array)} vs {n_profiles})."
                     )
                 selected_profile_ids = self._site.index[i_array].tolist()
-            elif pd.api.types.is_string_dtype(i_array) or pd.api.types.is_object_dtype(i_array):
+            elif pd.api.types.is_string_dtype(i_array) or pd.api.types.is_object_dtype(
+                i_array
+            ):
                 selected_profile_ids = list(i_array)
-                missing = [pid for pid in selected_profile_ids if pid not in self._site.index]
+                missing = [
+                    pid for pid in selected_profile_ids if pid not in self._site.index
+                ]
                 if missing:
                     raise KeyError(f"Profile IDs not found: {missing}")
             else:
@@ -739,7 +786,9 @@ class SoilProfileCollection:
             if isinstance(j_selector, (list, tuple, np.ndarray)):
                 j_array = np.asarray(j_selector)
                 if not pd.api.types.is_integer_dtype(j_array):
-                    raise TypeError("Horizon selector list/array 'j' must contain integers.")
+                    raise TypeError(
+                        "Horizon selector list/array 'j' must contain integers."
+                    )
 
             global _select_hz_by_iloc
 
@@ -747,16 +796,21 @@ class SoilProfileCollection:
             selected_hz_groups = intermediate_horizons.groupby(
                 self.idname, sort=False, observed=True
             ).apply(
-                _select_hz_by_iloc, j_sel=j_selector, top_col=self._topcol, include_groups=False
+                _select_hz_by_iloc,
+                j_sel=j_selector,
+                top_col=self._topcol,
+                include_groups=False,
             )
 
             if isinstance(selected_hz_groups.index, pd.MultiIndex):
                 new_horizons = selected_hz_groups.reset_index(level=0)
-                
+
                 if new_horizons.columns[0] == self.idname:
-                    pass 
+                    pass
                 else:
-                    new_horizons = new_horizons.rename(columns={new_horizons.columns[0]: self.idname})
+                    new_horizons = new_horizons.rename(
+                        columns={new_horizons.columns[0]: self.idname}
+                    )
             else:
                 new_horizons = selected_hz_groups
 
@@ -828,7 +882,9 @@ class SoilProfileCollection:
             required_cols = [id_col, hzid_col, top_col, bottom_col]
             missing = [c for c in required_cols if c not in hz.columns]
             if missing:
-                raise KeyError(f"Required columns for depths(how='hz') not found: {missing}")
+                raise KeyError(
+                    f"Required columns for depths(how='hz') not found: {missing}"
+                )
             return hz[required_cols].copy()
 
         # --- Aggregation Modes ('min', 'max', 'minmax') ---
@@ -843,9 +899,13 @@ class SoilProfileCollection:
 
         # Calculate aggregations
         if how == "min":
-            summary_df = hz.groupby(id_col, observed=True).agg(min_depth=(top_col, "min"))
+            summary_df = hz.groupby(id_col, observed=True).agg(
+                min_depth=(top_col, "min")
+            )
         elif how == "max":
-            summary_df = hz.groupby(id_col, observed=True).agg(max_depth=(bottom_col, "max"))
+            summary_df = hz.groupby(id_col, observed=True).agg(
+                max_depth=(bottom_col, "max")
+            )
         elif how == "minmax":
             summary_df = hz.groupby(id_col, observed=True).agg(
                 min_depth=(top_col, "min"), max_depth=(bottom_col, "max")
@@ -903,7 +963,9 @@ class SoilProfileCollection:
         ) and pd.api.types.is_numeric_dtype(self._horizons[self._bottomcol]):
             return self._horizons[self._bottomcol] - self._horizons[self._topcol]
         else:
-            print("Warning: Cannot calculate thickness because depth columns are not numeric.")
+            print(
+                "Warning: Cannot calculate thickness because depth columns are not numeric."
+            )
             # Return a series of NaN with the correct index
             return pd.Series(np.nan, index=self._horizons.index)
 
@@ -964,7 +1026,9 @@ class SoilProfileCollection:
                 result = func(horizon_data, *args, **kwargs)
                 results[profile_id] = result
             except Exception as e:
-                print(f"Warning: Error applying function to profile '{profile_id}': {e}")
+                print(
+                    f"Warning: Error applying function to profile '{profile_id}': {e}"
+                )
                 results[profile_id] = np.nan  # Or some other error indicator
 
         result_series = pd.Series(results).reindex(self._site.index)
@@ -1036,7 +1100,11 @@ class SoilProfileCollection:
         if ax is None:
             # Adjust default figsize calculation slightly
             num_profiles_to_plot = min(len(self), n) if n is not None else len(self)
-            fig_width = figsize[0] if figsize else max(6, num_profiles_to_plot * (width + spacing))
+            fig_width = (
+                figsize[0]
+                if figsize
+                else max(6, num_profiles_to_plot * (width + spacing))
+            )
             fig_height = figsize[1] if figsize else 6
             fig, ax = plt.subplots(figsize=(fig_width, fig_height))
         else:
@@ -1048,7 +1116,12 @@ class SoilProfileCollection:
 
         if not profile_ids_to_plot:
             ax.text(
-                0.5, 0.5, "No profiles to plot.", ha="center", va="center", transform=ax.transAxes
+                0.5,
+                0.5,
+                "No profiles to plot.",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
             )
             return ax
 
@@ -1090,14 +1163,18 @@ class SoilProfileCollection:
                     try:
                         cmap_obj = cm.get_cmap(cmap)
                     except ValueError:
-                        print(f"Warning: Invalid colormap name '{cmap}'. Using 'viridis'.")
+                        print(
+                            f"Warning: Invalid colormap name '{cmap}'. Using 'viridis'."
+                        )
                         cmap_obj = cm.get_cmap("viridis")
             else:
                 fixed_color = color
 
         # --- Plotting Loop ---
         for i, profile_id in enumerate(profile_ids_to_plot):
-            profile_horizons = self.get_profile(profile_id)  # Already sorted by get_profile
+            profile_horizons = self.get_profile(
+                profile_id
+            )  # Already sorted by get_profile
 
             if profile_horizons is None or profile_horizons.empty:
                 continue
@@ -1123,10 +1200,16 @@ class SoilProfileCollection:
 
                 if color_source_is_column and hz_colors_series is not None:
                     value = (
-                        hz_colors_series.loc[hzid] if hzid in hz_colors_series.index else None
+                        hz_colors_series.loc[hzid]
+                        if hzid in hz_colors_series.index
+                        else None
                     )  # Get value using original hzid index
                     if is_numeric_color_col:
-                        if value is not None and norm is not None and cmap_obj is not None:
+                        if (
+                            value is not None
+                            and norm is not None
+                            and cmap_obj is not None
+                        ):
                             try:
                                 # Normalize value and get color from cmap
                                 horizon_color = cmap_obj(norm(float(value)))
@@ -1273,7 +1356,9 @@ class SoilProfileCollection:
 
         # --- Determine Effective Settings ---
         if truncate is None:  # User didn't specify
-            effective_truncate = agg_fun is not None  # True for aggregation, False for slicing
+            effective_truncate = (
+                agg_fun is not None
+            )  # True for aggregation, False for slicing
         else:  # User specified True or False
             effective_truncate = truncate
 
@@ -1337,7 +1422,9 @@ class SoilProfileCollection:
             mode = "aggregation"
             if v is None:
                 if agg_fun in numeric_agg_funs:
-                    potential_vars = hz.select_dtypes(include=np.number).columns.tolist()
+                    potential_vars = hz.select_dtypes(
+                        include=np.number
+                    ).columns.tolist()
                     vars_to_agg = [
                         col
                         for col in potential_vars
@@ -1355,7 +1442,9 @@ class SoilProfileCollection:
                         if col not in [id_col, top_col, bottom_col, original_hzid_col]
                     ]
                     if not vars_to_agg:
-                        raise ValueError("No suitable columns found for agg_fun='dominant'.")
+                        raise ValueError(
+                            "No suitable columns found for agg_fun='dominant'."
+                        )
                 else:
                     raise ValueError(
                         "Cannot auto-detect variables for unknown agg_fun."
@@ -1369,10 +1458,14 @@ class SoilProfileCollection:
 
             missing_vars = [col for col in vars_to_agg if col not in hz.columns]
             if missing_vars:
-                raise ValueError(f"Variable(s) not found in horizon data: {missing_vars}")
+                raise ValueError(
+                    f"Variable(s) not found in horizon data: {missing_vars}"
+                )
             if agg_fun in numeric_agg_funs:
                 non_numeric_vars = [
-                    col for col in vars_to_agg if not pd.api.types.is_numeric_dtype(hz[col])
+                    col
+                    for col in vars_to_agg
+                    if not pd.api.types.is_numeric_dtype(hz[col])
                 ]
                 if non_numeric_vars:
                     raise ValueError(
@@ -1412,9 +1505,12 @@ class SoilProfileCollection:
 
             if fill:
                 all_profile_ids = self._site.index
-                interval_df = pd.DataFrame(slice_intervals, columns=[top_col, bottom_col])
+                interval_df = pd.DataFrame(
+                    slice_intervals, columns=[top_col, bottom_col]
+                )
                 multi_index = pd.MultiIndex.from_product(
-                    [all_profile_ids, interval_df.index], names=[id_col, "_interval_idx"]
+                    [all_profile_ids, interval_df.index],
+                    names=[id_col, "_interval_idx"],
                 )
                 full_template = pd.DataFrame(index=multi_index)
                 interval_df["_interval_idx"] = interval_df.index
@@ -1428,13 +1524,19 @@ class SoilProfileCollection:
 
                 if not glommed_data.empty:
                     try:
-                        glommed_data_indexed = glommed_data.set_index([id_col, top_col, bottom_col])
+                        glommed_data_indexed = glommed_data.set_index(
+                            [id_col, top_col, bottom_col]
+                        )
                     except KeyError as e:
                         raise RuntimeError(f"Aggregated data missing columns: {e}")
-                    final_data_filled = glommed_data_indexed.reindex(full_template_indexed.index)
+                    final_data_filled = glommed_data_indexed.reindex(
+                        full_template_indexed.index
+                    )
                 else:
                     final_data_filled = pd.DataFrame(
-                        np.nan, index=full_template_indexed.index, columns=vars_aggregated
+                        np.nan,
+                        index=full_template_indexed.index,
+                        columns=vars_aggregated,
                     )
                 final_data_df = final_data_filled.reset_index()
             else:
@@ -1448,24 +1550,34 @@ class SoilProfileCollection:
 
         try:
             if id_col in final_data_df.columns:
-                final_data_df[id_col] = final_data_df[id_col].astype(self._site.index.dtype)
+                final_data_df[id_col] = final_data_df[id_col].astype(
+                    self._site.index.dtype
+                )
             if top_col in final_data_df.columns:
-                final_data_df[top_col] = pd.to_numeric(final_data_df[top_col], errors="coerce")
+                final_data_df[top_col] = pd.to_numeric(
+                    final_data_df[top_col], errors="coerce"
+                )
             if bottom_col in final_data_df.columns:
                 final_data_df[bottom_col] = pd.to_numeric(
                     final_data_df[bottom_col], errors="coerce"
                 )
-            if agg_fun is not None:  # Only force numeric for aggregation results if needed
+            if (
+                agg_fun is not None
+            ):  # Only force numeric for aggregation results if needed
                 for var in vars_aggregated:
                     if var not in final_data_df.columns:
                         continue
                     original_is_numeric = pd.api.types.is_numeric_dtype(hz.get(var))
-                    target_is_numeric = pd.api.types.is_numeric_dtype(final_data_df[var])
+                    target_is_numeric = pd.api.types.is_numeric_dtype(
+                        final_data_df[var]
+                    )
                     if (
                         agg_fun in numeric_agg_funs or original_is_numeric
                     ) and not target_is_numeric:
                         if pd.api.types.is_object_dtype(final_data_df[var]):
-                            final_data_df[var] = pd.to_numeric(final_data_df[var], errors="coerce")
+                            final_data_df[var] = pd.to_numeric(
+                                final_data_df[var], errors="coerce"
+                            )
         except Exception as e:
             print(f"Warning: Could not enforce final dtypes consistently: {e}")
 
@@ -1473,9 +1585,12 @@ class SoilProfileCollection:
             return final_data_df
         else:
             if final_data_df.empty:
-                empty_hz_cols = [id_col, effective_new_hzidname, top_col, bottom_col] + (
-                    vars_aggregated if agg_fun else list(hz.columns)
-                )
+                empty_hz_cols = [
+                    id_col,
+                    effective_new_hzidname,
+                    top_col,
+                    bottom_col,
+                ] + (vars_aggregated if agg_fun else list(hz.columns))
                 empty_hz_cols = list(dict.fromkeys(empty_hz_cols))
                 empty_hz = pd.DataFrame(columns=empty_hz_cols).astype(
                     {id_col: self._site.index.dtype, top_col: float, bottom_col: float}
@@ -1513,7 +1628,9 @@ class SoilProfileCollection:
             try:
                 new_site_df = self._site.loc[profile_ids_in_result].copy()
             except KeyError:
-                new_site_df = self._site[self._site.index.isin(profile_ids_in_result)].copy()
+                new_site_df = self._site[
+                    self._site.index.isin(profile_ids_in_result)
+                ].copy()
             except Exception as e:
                 raise RuntimeError(f"Could not filter site data for resulting SPC: {e}")
 
@@ -1543,7 +1660,9 @@ class SoilProfileCollection:
                 print(
                     f"  Horizons ({new_horizons_df.shape}):\n{new_horizons_df.head().to_string()}"
                 )
-                print(f"  Site ({new_site_df.shape}):\n{new_site_df.head().to_string()}")
+                print(
+                    f"  Site ({new_site_df.shape}):\n{new_site_df.head().to_string()}"
+                )
                 print(
                     f"  idname='{id_col}', hzidname='{effective_new_hzidname}', depthcols=({top_col}, {bottom_col}), hzdesgncol='{final_hzdesgncol}'"
                 )
