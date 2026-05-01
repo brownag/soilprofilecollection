@@ -1,3 +1,8 @@
+# soilprofilecollection 0.3.1
+
+- Bug fix in `.from_dataframe()`:                                                                                                                               
+  - Changed inference to check if standard names exist in the schema, and raise a ValueError if they don't (instead of silently defaulting), but allowing user-provided idname/hzidname/depthcols to pass through to the constructor.
+                                                                                                                                   
 # soilprofilecollection 0.3.0
 
 - **BREAKING**: matplotlib is now an optional dependency. Install with `pip install soilprofilecollection[plot]` to use the `.plot()` method.
